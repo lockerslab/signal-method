@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Signal Method · Clasificador Batch</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,300;1,9..144,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0e0e0f;
+  --bg2: #161618;
+  --bg3: #1e1e21;
+  --bg4: #252528;
+  --text: #f0efec;
+  --text2: #9a9998;
+  --text3: #5a5958;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.12);
+
+  --rojo: #ff4444;
+  --rojo-bg: rgba(255,68,68,0.08);
+  --amarillo: #f5c542;
+  --amarillo-bg: rgba(245,197,66,0.08);
+  --naranja: #ff8c42;
+  --naranja-bg: rgba(255,140,66,0.08);
+  --verde: #3ecf8e;
+  --verde-bg: rgba(62,207,142,0.08);
+  --radius: 8px;
+  --radius-lg: 14px;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+.wrap {
+  position: relative;
+  z-index: 1;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.logo-block { display: flex; flex-direction: column; gap: 4px; }
+.logo {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+.headline {
+  font-family: 'Fraunces', serif;
+  font-size: 26px;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--text);
+}
+.version-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+  border: 1px solid var(--border2);
+  padding: 4px 10px;
+  border-radius: 100px;
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+  align-self: flex-start;
+}
+
+/* UPLOAD ZONE */
+.upload-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  margin-bottom: 1rem;
+}
+
+.mono-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.drop-zone {
+  border: 1.5px dashed var(--border2);
+  border-radius: var(--radius);
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: var(--text3);
+  background: var(--bg3);
+}
+
+.drop-icon { font-size: 28px; margin-bottom: 10px; opacity: 0.6; }
+.drop-text { font-size: 14px; color: var(--text2); margin-bottom: 6px; }
+.drop-hint { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; }
+
+.drop-zone input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
+}
+
+.file-loaded {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-top: 12px;
+}
+
+.file-info { display: flex; align-items: center; gap: 10px; }
+.file-icon { font-size: 18px; }
+.file-name { font-size: 13px; font-weight: 500; color: var(--text); }
+.file-count { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); }
+
+.btn-remove {
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  transition: color 0.2s;
+}
+.btn-remove:hover { color: var(--rojo); }
+
+/* COLUMNS SETUP */
+.columns-card {
+  display: none;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  margin-bottom: 1rem;
+}
+
+.col-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.col-group { display: flex; flex-direction: column; gap: 6px; }
+
+label { font-size: 12px; font-weight: 500; color: var(--text2); }
+
+select {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  padding: 9px 12px;
+  outline: none;
+  -webkit-appearance: none;
+  transition: border-color 0.2s;
+}
+select:focus { border-color: var(--text3); }
+select option { background: var(--bg3); }
+
+/* PREVIEW TABLE */
+.preview-card {
+  display: none;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  margin-bottom: 1rem;
+}
+
+.table-wrap { overflow-x: auto; margin-top: 8px; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+th {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text2);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--bg3); }
+
+/* BUTTONS */
+.btn-row { display: flex; gap: 10px; margin-top: 0.5rem; }
+
+.btn-primary {
+  flex: 1;
+  padding: 13px;
+  background: var(--text);
+  color: var(--bg);
+  border: none;
+  border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn-primary:hover { opacity: 0.88; }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.btn-secondary {
+  padding: 13px 18px;
+  background: transparent;
+  color: var(--text2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+.btn-secondary:hover { color: var(--text); border-color: var(--text3); }
+
+/* PROGRESS */
+.progress-card {
+  display: none;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  margin-bottom: 1rem;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.progress-title { font-size: 14px; font-weight: 500; }
+
+.progress-counter {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  color: var(--text3);
+}
+
+.progress-bar-bg {
+  height: 4px;
+  background: var(--bg4);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--verde);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+  width: 0%;
+}
+
+.progress-current {
+  font-size: 12px;
+  color: var(--text3);
+  font-style: italic;
+}
+
+/* RESULTS */
+.results-card {
+  display: none;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 1rem;
+  animation: slideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.results-header {
+  padding: 1.25rem 1.75rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.results-title { font-size: 15px; font-weight: 500; }
+
+.summary-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.summary-pill {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  border: 1px solid;
+}
+.summary-pill.rojo { color: var(--rojo); border-color: rgba(255,68,68,0.3); background: var(--rojo-bg); }
+.summary-pill.amarillo { color: var(--amarillo); border-color: rgba(245,197,66,0.3); background: var(--amarillo-bg); }
+.summary-pill.naranja { color: var(--naranja); border-color: rgba(255,140,66,0.3); background: var(--naranja-bg); }
+.summary-pill.verde { color: var(--verde); border-color: rgba(62,207,142,0.3); background: var(--verde-bg); }
+
+.results-list { padding: 0; }
+
+.result-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 1.75rem;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.result-row:last-child { border-bottom: none; }
+.result-row:hover { background: var(--bg3); cursor: pointer; }
+
+.result-emoji { font-size: 20px; text-align: center; }
+
+.result-info {}
+.result-empresa { font-size: 14px; font-weight: 500; color: var(--text); }
+.result-resumen { font-size: 12px; color: var(--text3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 450px; }
+
+.result-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+.result-badge.rojo { color: var(--rojo); border-color: rgba(255,68,68,0.3); background: var(--rojo-bg); }
+.result-badge.amarillo { color: var(--amarillo); border-color: rgba(245,197,66,0.3); background: var(--amarillo-bg); }
+.result-badge.naranja { color: var(--naranja); border-color: rgba(255,140,66,0.3); background: var(--naranja-bg); }
+.result-badge.verde { color: var(--verde); border-color: rgba(62,207,142,0.3); background: var(--verde-bg); }
+
+/* MODAL */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  backdrop-filter: blur(4px);
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 540px;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: slideUp 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.modal-empresa { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 300; font-style: italic; }
+.modal-tipo {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+.modal-tipo.rojo { color: var(--rojo); }
+.modal-tipo.amarillo { color: var(--amarillo); }
+.modal-tipo.naranja { color: var(--naranja); }
+.modal-tipo.verde { color: var(--verde); }
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 2px;
+  transition: color 0.2s;
+  line-height: 1;
+}
+.modal-close:hover { color: var(--text); }
+
+.modal-body { padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+
+.section-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 6px;
+}
+
+.analysis-text { font-size: 13px; line-height: 1.7; color: var(--text2); }
+.tags-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font-size: 11px; color: var(--text2); background: var(--bg3); border: 1px solid var(--border2); border-radius: 100px; padding: 3px 10px; }
+.actions-list { display: flex; flex-direction: column; gap: 5px; }
+.action-item { font-size: 12px; color: var(--text2); padding: 8px 12px; border-radius: var(--radius); border-left: 2px solid; line-height: 1.5; }
+.action-item.rojo { background: var(--rojo-bg); border-color: var(--rojo); }
+.action-item.amarillo { background: var(--amarillo-bg); border-color: var(--amarillo); }
+.action-item.naranja { background: var(--naranja-bg); border-color: var(--naranja); }
+.action-item.verde { background: var(--verde-bg); border-color: var(--verde); }
+.warning-box { font-size: 12px; color: var(--amarillo); background: var(--amarillo-bg); border: 1px solid rgba(245,197,66,0.2); border-radius: var(--radius); padding: 8px 12px; line-height: 1.5; }
+
+.pulse-dots { display: flex; gap: 4px; }
+.pulse-dot { width: 5px; height: 5px; background: var(--text3); border-radius: 50%; animation: pulse 1.2s ease-in-out infinite; }
+.pulse-dot:nth-child(2) { animation-delay: 0.2s; }
+.pulse-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+.footer { margin-top: 3rem; text-align: center; font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text3); letter-spacing: 0.08em; }
+
+@media (max-width: 560px) {
+  .col-grid { grid-template-columns: 1fr; }
+  .result-row { grid-template-columns: 28px 1fr; }
+  .result-badge { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="header">
+    <div class="logo-block">
+      <span class="logo">Casilleros Lab</span>
+      <h1 class="headline">Signal Method · Batch</h1>
+    </div>
+    <span class="version-badge">v2.0 · Masivo</span>
+  </header>
+
+  <!-- UPLOAD -->
+  <div class="upload-card">
+    <span class="mono-label">01 · Subí tu lista de prospectos</span>
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" accept=".xlsx,.xls,.csv" id="file-input" onchange="handleFile(event)" />
+      <div class="drop-icon">📊</div>
+      <div class="drop-text">Arrastrá tu Excel o CSV acá</div>
+      <div class="drop-hint">Columnas mínimas: empresa + señales detectadas</div>
+    </div>
+    <div class="file-loaded" id="file-loaded">
+      <div class="file-info">
+        <span class="file-icon">📋</span>
+        <div>
+          <div class="file-name" id="file-name"></div>
+          <div class="file-count" id="file-count"></div>
+        </div>
+      </div>
+      <button class="btn-remove" onclick="removeFile()" title="Quitar archivo">✕</button>
+    </div>
+
+    <div style="margin-top: 12px;">
+      <button class="btn-secondary" onclick="descargarPlantilla()" style="font-size:12px; padding: 8px 14px;">
+        ↓ Descargar plantilla de ejemplo
+      </button>
+    </div>
+  </div>
+
+  <!-- COLUMNS -->
+  <div class="columns-card" id="columns-card">
+    <span class="mono-label">02 · Mapeá las columnas de tu archivo</span>
+    <div class="col-grid">
+      <div class="col-group">
+        <label>Columna "Empresa" *</label>
+        <select id="col-empresa"></select>
+      </div>
+      <div class="col-group">
+        <label>Columna "Señales detectadas" *</label>
+        <select id="col-senales"></select>
+      </div>
+      <div class="col-group">
+        <label>Columna "Contexto" (opcional)</label>
+        <select id="col-contexto"><option value="">— ninguna —</option></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREVIEW -->
+  <div class="preview-card" id="preview-card">
+    <span class="mono-label">03 · Vista previa de los datos</span>
+    <div class="table-wrap">
+      <table id="preview-table"></table>
+    </div>
+    <div class="btn-row" style="margin-top: 1.25rem;">
+      <button class="btn-primary" id="btn-run" onclick="correrBatch()">
+        Clasificar todos los prospectos →
+      </button>
+      <button class="btn-secondary" onclick="resetAll()">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-card" id="progress-card">
+    <div class="progress-header">
+      <span class="progress-title">Clasificando prospectos...</span>
+      <span class="progress-counter" id="progress-counter">0 / 0</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progress-bar"></div>
+    </div>
+    <div class="progress-current" id="progress-current">Iniciando...</div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-card" id="results-card">
+    <div class="results-header">
+      <span class="results-title">Resultados de clasificación</span>
+      <div class="summary-pills" id="summary-pills"></div>
+    </div>
+    <div class="results-list" id="results-list"></div>
+    <div class="btn-row" style="padding: 1.25rem 1.75rem;">
+      <button class="btn-primary" onclick="exportarResultados()">↓ Exportar a Excel</button>
+      <button class="btn-secondary" onclick="resetAll()">Nueva clasificación</button>
+    </div>
+  </div>
+
+  <div class="footer">Signal Method · Casilleros Lab · Powered by Claude · Anthropic</div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-empresa" id="modal-empresa"></div>
+        <div class="modal-tipo" id="modal-tipo"></div>
+      </div>
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+const EMOJIS = { ROJO: '🔴', AMARILLO: '🟡', NARANJA: '🟠', VERDE: '🟢' };
+const LABELS = {
+  ROJO: 'Señal Roja · Sin intención activa',
+  AMARILLO: 'Señal Amarilla · Nurturing suave',
+  NARANJA: 'Señal Naranja · Abrir conversación',
+  VERDE: 'Señal Verde · Contacto directo ahora'
+};
+
+let prospectos = [];
+let resultados = [];
+let columnas = [];
+
+// DRAG & DROP
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) procesarArchivo(file);
+});
+
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (file) procesarArchivo(file);
+}
+
+function procesarArchivo(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      let data;
+      if (file.name.endsWith('.csv')) {
+        const text = e.target.result;
+        const lines = text.split('\n').filter(l => l.trim());
+        columnas = lines[0].split(',').map(c => c.trim().replace(/"/g,''));
+        data = lines.slice(1).map(l => {
+          const vals = l.split(',').map(v => v.trim().replace(/"/g,''));
+          const obj = {};
+          columnas.forEach((c, i) => obj[c] = vals[i] || '');
+          return obj;
+        });
+      } else {
+        const wb = XLSX.read(e.target.result, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        data = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        columnas = data.length > 0 ? Object.keys(data[0]) : [];
+      }
+
+      prospectos = data.filter(r => Object.values(r).some(v => String(v).trim()));
+
+      document.getElementById('file-name').textContent = file.name;
+      document.getElementById('file-count').textContent = `${prospectos.length} prospectos encontrados`;
+      document.getElementById('file-loaded').style.display = 'flex';
+
+      poblarSelectores();
+      document.getElementById('columns-card').style.display = 'block';
+      actualizarPreview();
+      document.getElementById('preview-card').style.display = 'block';
+
+    } catch(err) {
+      alert('Error al leer el archivo. Asegurate de que sea un Excel (.xlsx) o CSV válido.');
+      console.error(err);
+    }
+  };
+  if (file.name.endsWith('.csv')) {
+    reader.readAsText(file);
+  } else {
+    reader.readAsBinaryString(file);
+  }
+}
+
+function poblarSelectores() {
+  const ids = ['col-empresa', 'col-senales', 'col-contexto'];
+  const labels = ['', '', '— ninguna —'];
+  ids.forEach((id, idx) => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = idx === 2 ? '<option value="">— ninguna —</option>' : '';
+    columnas.forEach(col => {
+      const opt = document.createElement('option');
+      opt.value = col; opt.textContent = col;
+      sel.appendChild(opt);
+    });
+  });
+
+  // Auto-detect columns
+  const empresaGuess = columnas.find(c => /empresa|company|nombre|name/i.test(c));
+  const senalesGuess = columnas.find(c => /señal|senal|signal|accion|comportamiento|actividad/i.test(c));
+  const contextoGuess = columnas.find(c => /contexto|context|situacion|info/i.test(c));
+  if (empresaGuess) document.getElementById('col-empresa').value = empresaGuess;
+  if (senalesGuess) document.getElementById('col-senales').value = senalesGuess;
+  if (contextoGuess) document.getElementById('col-contexto').value = contextoGuess;
+
+  ['col-empresa','col-senales','col-contexto'].forEach(id => {
+    document.getElementById(id).addEventListener('change', actualizarPreview);
+  });
+}
+
+function actualizarPreview() {
+  const colE = document.getElementById('col-empresa').value;
+  const colS = document.getElementById('col-senales').value;
+  const colC = document.getElementById('col-contexto').value;
+
+  const cols = [colE, colS, colC].filter(Boolean);
+  const preview = prospectos.slice(0, 5);
+
+  const table = document.getElementById('preview-table');
+  table.innerHTML = `
+    <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+    <tbody>
+      ${preview.map(row => `<tr>${cols.map(c => `<td title="${row[c] || ''}">${row[c] || '—'}</td>`).join('')}</tr>`).join('')}
+    </tbody>
+  `;
+}
+
+async function correrBatch() {
+  const colE = document.getElementById('col-empresa').value;
+  const colS = document.getElementById('col-senales').value;
+  const colC = document.getElementById('col-contexto').value;
+
+  if (!colE || !colS) { alert('Seleccioná al menos la columna de empresa y señales.'); return; }
+
+  document.getElementById('preview-card').style.display = 'none';
+  document.getElementById('columns-card').style.display = 'none';
+  document.getElementById('progress-card').style.display = 'block';
+  resultados = [];
+
+  const total = prospectos.length;
+
+  for (let i = 0; i < total; i++) {
+    const row = prospectos[i];
+    const empresa = String(row[colE] || '').trim();
+    const senales = String(row[colS] || '').trim();
+    const contexto = colC ? String(row[colC] || '').trim() : '';
+
+    document.getElementById('progress-counter').textContent = `${i + 1} / ${total}`;
+    document.getElementById('progress-bar').style.width = `${((i + 1) / total) * 100}%`;
+    document.getElementById('progress-current').textContent = `Clasificando: ${empresa || 'Prospecto ' + (i+1)}`;
+
+    if (!empresa && !senales) {
+      resultados.push({ ...row, _clasificacion: 'ROJO', _resumen: 'Sin datos suficientes', _senales: [], _acciones: [], _confianza: 1 });
+      continue;
+    }
+
+    try {
+      const r = await clasificarProspecto(empresa, senales, contexto);
+      resultados.push({ ...row, ...r });
+    } catch(e) {
+      resultados.push({ ...row, _clasificacion: 'AMARILLO', _resumen: 'Error al clasificar', _senales: [], _acciones: [], _confianza: 1 });
+    }
+
+    // Small delay to avoid rate limits
+    if (i < total - 1) await new Promise(res => setTimeout(res, 400));
+  }
+
+  document.getElementById('progress-card').style.display = 'none';
+  renderResultados();
+}
+
+async function clasificarProspecto(empresa, senales, contexto) {
+  const prompt = `Sos el motor de clasificación del Signal Method, framework de demand generation B2B para LATAM.
+
+Estados:
+- ROJO: Sin señal activa. Educación largo plazo.
+- AMARILLO: Señal débil. Nurturing suave.
+- NARANJA: Señal moderada. Abrir conversación.
+- VERDE: Señal fuerte. Contacto directo ahora.
+
+PROSPECTO:
+Empresa: ${empresa}
+Señales detectadas: ${senales}
+Contexto: ${contexto || 'No proporcionado'}
+
+Respondé SOLO con JSON válido, sin texto adicional:
+{"clasificacion":"ROJO|AMARILLO|NARANJA|VERDE","nivel_confianza":1-10,"resumen":"2 oraciones de diagnóstico","senales_clave":["s1","s2"],"acciones_recomendadas":["a1","a2","a3"],"advertencia":"texto o null"}`;
+
+  const response = await fetch('/.netlify/functions/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-app-token': 'signal-casilleros-2026' },
+    body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+  });
+
+  const data = await response.json();
+  const text = data.content[0].text.replace(/```json|```/g, '').trim();
+  const r = JSON.parse(text);
+
+  return {
+    _clasificacion: r.clasificacion,
+    _confianza: r.nivel_confianza,
+    _resumen: r.resumen,
+    _senales: r.senales_clave || [],
+    _acciones: r.acciones_recomendadas || [],
+    _advertencia: r.advertencia
+  };
+}
+
+function renderResultados() {
+  const counts = { ROJO: 0, AMARILLO: 0, NARANJA: 0, VERDE: 0 };
+  resultados.forEach(r => { if (counts[r._clasificacion] !== undefined) counts[r._clasificacion]++; });
+
+  const pills = Object.entries(counts).filter(([,v]) => v > 0).map(([k, v]) =>
+    `<span class="summary-pill ${k.toLowerCase()}">${EMOJIS[k]} ${k} · ${v}</span>`
+  ).join('');
+  document.getElementById('summary-pills').innerHTML = pills;
+
+  const list = document.getElementById('results-list');
+  list.innerHTML = resultados.map((r, i) => {
+    const cls = (r._clasificacion || 'AMARILLO').toLowerCase();
+    const colE = document.getElementById('col-empresa').value;
+    const empresa = r[colE] || `Prospecto ${i+1}`;
+    return `
+      <div class="result-row" onclick="openModal(${i})">
+        <div class="result-emoji">${EMOJIS[r._clasificacion] || '⚪'}</div>
+        <div class="result-info">
+          <div class="result-empresa">${empresa}</div>
+          <div class="result-resumen">${r._resumen || '—'}</div>
+        </div>
+        <span class="result-badge ${cls}">${r._clasificacion}</span>
+      </div>
+    `;
+  }).join('');
+
+  document.getElementById('results-card').style.display = 'block';
+  document.getElementById('results-card').scrollIntoView({ behavior: 'smooth' });
+}
+
+function openModal(idx) {
+  const r = resultados[idx];
+  const cls = (r._clasificacion || 'AMARILLO').toLowerCase();
+  const colE = document.getElementById('col-empresa').value;
+  const empresa = r[colE] || `Prospecto ${idx+1}`;
+
+  document.getElementById('modal-empresa').textContent = empresa;
+  document.getElementById('modal-tipo').textContent = LABELS[r._clasificacion] || '';
+  document.getElementById('modal-tipo').className = 'modal-tipo ' + cls;
+
+  const tags = (r._senales || []).map(s => `<span class="tag">${s}</span>`).join('');
+  const acciones = (r._acciones || []).map(a => `<div class="action-item ${cls}">${a}</div>`).join('');
+  const warning = r._advertencia ? `<div><div class="section-label">Advertencia</div><div class="warning-box">⚠ ${r._advertencia}</div></div>` : '';
+
+  document.getElementById('modal-body').innerHTML = `
+    <div><div class="section-label">Diagnóstico · Confianza ${r._confianza}/10</div><div class="analysis-text">${r._resumen}</div></div>
+    <div><div class="section-label">Señales identificadas</div><div class="tags-wrap">${tags || '<span style="color:var(--text3);font-size:12px">No identificadas</span>'}</div></div>
+    <div><div class="section-label">Acciones recomendadas</div><div class="actions-list">${acciones}</div></div>
+    ${warning}
+  `;
+
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModalDirect();
+}
+
+function closeModalDirect() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+function exportarResultados() {
+  const colE = document.getElementById('col-empresa').value;
+  const exportData = resultados.map(r => ({
+    Empresa: r[colE] || '',
+    Clasificacion: r._clasificacion || '',
+    Confianza: r._confianza || '',
+    Resumen: r._resumen || '',
+    Senales_Clave: (r._senales || []).join('; '),
+    Acciones_Recomendadas: (r._acciones || []).join('; '),
+    Advertencia: r._advertencia || ''
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(exportData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Signal Method Results');
+  XLSX.writeFile(wb, `signal-method-resultados-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function descargarPlantilla() {
+  const data = [
+    { Empresa: 'Alpha SaaS', Señales_detectadas: 'Su CRO publicó sobre inefficiencias en el proceso de ventas, visitaron la página de precios 3 veces', Contexto: 'Levantaron Serie A hace 3 meses, están en expansión' },
+    { Empresa: 'Beta Corp', Señales_detectadas: 'Ninguna señal detectada aún, contacto frío', Contexto: 'Empresa establecida, mercado estable' },
+    { Empresa: 'Gamma Tech', Señales_detectadas: 'Respondió cold email con preguntas concretas sobre el servicio, pidió un demo', Contexto: 'Regulación nueva los obliga a digitalizar procesos en 90 días' },
+    { Empresa: 'Delta SA', Señales_detectadas: 'CEO compartió artículo sobre transformación digital, comentó positivamente', Contexto: 'Sin información adicional' },
+    { Empresa: 'Epsilon Ltda', Señales_detectadas: 'Descargaron dos whitepapers, abrieron 4 emails de la secuencia', Contexto: 'Competidor directo de un cliente actual nuestro' }
+  ];
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Prospectos');
+  XLSX.writeFile(wb, 'plantilla_signal_method.xlsx');
+}
+
+function removeFile() {
+  document.getElementById('file-input').value = '';
+  document.getElementById('file-loaded').style.display = 'none';
+  document.getElementById('columns-card').style.display = 'none';
+  document.getElementById('preview-card').style.display = 'none';
+  prospectos = []; columnas = [];
+}
+
+function resetAll() {
+  removeFile();
+  resultados = [];
+  document.getElementById('progress-card').style.display = 'none';
+  document.getElementById('results-card').style.display = 'none';
+  document.getElementById('results-list').innerHTML = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
