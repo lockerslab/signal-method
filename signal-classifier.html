@@ -587,38 +587,19 @@ async function clasificar() {
   const pais = document.getElementById('pais').value;
   const contexto = document.getElementById('contexto').value.trim();
 
-  const prompt = `Sos el motor de clasificación del Signal Method, un framework de demand generation B2B para el mercado LATAM.
-
-Clasificás prospectos en 4 estados según señales observables de comportamiento:
-- ROJO: Sin señal activa. Sin intención de compra ni síntomas de dolor. Acción: educación largo plazo.
-- AMARILLO: Señal débil. Indicios leves, sin urgencia. Acción: nurturing suave, contenido relevante.
-- NARANJA: Señal moderada. Comportamiento activo pero sin urgencia de compra aún. Acción: contacto con valor, abrir conversación.
-- VERDE: Señal fuerte. Dolor activo, urgencia o intención clara de compra. Acción: outreach directo, propuesta de valor.
-
-PROSPECTO A CLASIFICAR:
-- Empresa: ${empresa}
-- País: ${pais || 'No especificado'}
-- Industria: ${industria || 'No especificada'}
-- Tamaño: ${tamano || 'No especificado'}
-- Señales detectadas: ${senales}
-- Contexto de la empresa: ${contexto || 'No proporcionado'}
-
-Respondé ÚNICAMENTE con un JSON válido, sin texto adicional, sin markdown:
-{
-  "clasificacion": "ROJO|AMARILLO|NARANJA|VERDE",
-  "nivel_confianza": 1-10,
-  "resumen": "2-3 oraciones explicando el diagnóstico específico para esta empresa",
-  "senales_clave": ["señal 1", "señal 2", "señal 3"],
-  "acciones_recomendadas": ["acción concreta 1", "acción concreta 2", "acción concreta 3"],
-  "advertencia": "texto si hay algo importante a considerar, o null si no hay"
-}`;
-
   try {
     const response = await fetch('/.netlify/functions/claude', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-app-token': 'signal-casilleros-2026' },
-      body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modo: 'individual', empresa, pais, industria, tamano, senales, contexto })
     });
+
+    if (!response.ok) {
+      let msg = 'Error al clasificar. Intentá de nuevo.';
+      try { const err = await response.json(); if (err && err.error) msg = err.error; } catch (_) {}
+      alert(msg);
+      return;
+    }
 
     const data = await response.json();
     const text = data.content[0].text.trim();

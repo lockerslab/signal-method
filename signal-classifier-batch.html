@@ -756,6 +756,11 @@ async function correrBatch() {
       const r = await clasificarProspecto(empresa, senales, contexto);
       resultados.push({ ...row, ...r });
     } catch(e) {
+      if (e.status === 429) {
+        // Se alcanzó el límite diario: frenamos el lote y mostramos lo ya clasificado.
+        alert(e.message + `\n\nSe clasificaron ${resultados.length} de ${total} prospectos.`);
+        break;
+      }
       resultados.push({ ...row, _clasificacion: 'AMARILLO', _resumen: 'Error al clasificar', _senales: [], _acciones: [], _confianza: 1 });
     }
 
@@ -768,27 +773,19 @@ async function correrBatch() {
 }
 
 async function clasificarProspecto(empresa, senales, contexto) {
-  const prompt = `Sos el motor de clasificación del Signal Method, framework de demand generation B2B para LATAM.
-
-Estados:
-- ROJO: Sin señal activa. Educación largo plazo.
-- AMARILLO: Señal débil. Nurturing suave.
-- NARANJA: Señal moderada. Abrir conversación.
-- VERDE: Señal fuerte. Contacto directo ahora.
-
-PROSPECTO:
-Empresa: ${empresa}
-Señales detectadas: ${senales}
-Contexto: ${contexto || 'No proporcionado'}
-
-Respondé SOLO con JSON válido, sin texto adicional:
-{"clasificacion":"ROJO|AMARILLO|NARANJA|VERDE","nivel_confianza":1-10,"resumen":"2 oraciones de diagnóstico","senales_clave":["s1","s2"],"acciones_recomendadas":["a1","a2","a3"],"advertencia":"texto o null"}`;
-
   const response = await fetch('/.netlify/functions/claude', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-app-token': 'signal-casilleros-2026' },
-    body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ modo: 'batch', empresa, senales, contexto })
   });
+
+  if (!response.ok) {
+    let msg = 'Error al clasificar';
+    try { const err = await response.json(); if (err && err.error) msg = err.error; } catch (_) {}
+    const e = new Error(msg);
+    e.status = response.status;
+    throw e;
+  }
 
   const data = await response.json();
   const text = data.content[0].text.replace(/```json|```/g, '').trim();
